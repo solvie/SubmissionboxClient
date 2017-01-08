@@ -1,8 +1,11 @@
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.entity.mime.content.FileBody;
@@ -27,18 +30,46 @@ public class HTTPMethods {
     //private static final String hostname = "localhost";
 
 
-    public static String getRequest(String loadpage, String params) throws Exception{
+    public static String getRequest(String loadpage, String params, SbUser user) throws Exception{
         CloseableHttpClient httpClient = HttpClientBuilder.create().build();
-        // specify the host, protocol, and port
         HttpHost target = new HttpHost(hostname, 8080, "http"); //TODO: this should be replaced by the actual address later
         String link = loadpage;
         if (params!=null)
             link = loadpage+"?"+params;
         HttpGet request = new HttpGet(link); //fixme hardcoded for test
+        request.setHeader("Authorization", "Basic " + encodeUser(user.getUsername(), user.getPassword()));
         HttpResponse httpResponse = httpClient.execute(target, request);
         HttpEntity entity = httpResponse.getEntity();
         if (entity != null)
             return EntityUtils.toString(entity);
+        httpClient.close();
+        return null;
+    }
+
+    public static String postRequest(String loadpage, String params, boolean asjson, SbUser user) throws Exception{
+        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
+        HttpHost target = new HttpHost(hostname, 8080, "http"); //TODO: this should be replaced by the actual address later
+        ObjectMapper mapper = new ObjectMapper();
+        String link= loadpage;
+        if (!asjson) {
+            if (params!=null)
+                link = loadpage+"?"+params;
+
+        }
+        HttpPost request = new HttpPost(link);
+
+        if (asjson) {
+            StringEntity paramsjson = new StringEntity(mapper.writeValueAsString(params));
+            request.addHeader("Content-Type", "application/json");
+            request.setEntity(paramsjson);
+        }
+        request.setHeader("Authorization", "Basic " + encodeUser(user.getUsername(), user.getPassword()));
+
+        HttpResponse httpResponse = httpClient.execute(target, request);
+        HttpEntity entity = httpResponse.getEntity();
+        if (entity != null) {
+            return EntityUtils.toString(entity);
+        }
         httpClient.close();
         return null;
     }
@@ -68,8 +99,8 @@ public class HTTPMethods {
         HttpResponse response = httpclient.execute(httppost);
         HttpEntity entity = response.getEntity();
         String responseString = EntityUtils.toString(entity);
-        System.out.println("executing request " + httppost.getRequestLine());
-        //System.out.println("Response was: "+response.getStatusLine());
+        //System.out.println("executing request " + httppost.getRequestLine());
+        System.out.println("Response was: "+response.getStatusLine());
         //System.out.println("Response was: "+responseString);
         httpclient.close();
         return new Message(Message.Mtype.SUCCESS, response.getStatusLine().toString(), responseString);
